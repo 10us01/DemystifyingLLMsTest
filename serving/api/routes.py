@@ -41,7 +41,7 @@ class RouteHandler:
             return 200, self.handler.handle_models()
 
         if method == "POST" and clean_path in ("/v1/completions", "/completions"):
-            request_body = body or {}
+            request_body = body if body is not None else {}
             try:
                 response = self.handler.handle_completion(request_body)
             except ValueError as exc:

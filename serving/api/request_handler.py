@@ -4,6 +4,7 @@ HTTP API request parsing, validation, and execution handler.
 
 import time
 import uuid
+import math
 from typing import Dict, Any, Optional, List
 from utils.logging_utils import get_logger
 
@@ -36,7 +37,29 @@ class RequestHandler:
         if not isinstance(prompt, str):
             raise ValueError("prompt must be a string")
         max_tokens = request_body.get("max_tokens", 16)
+        if not isinstance(max_tokens, int) or isinstance(max_tokens, bool) or max_tokens < 0:
+            raise ValueError("max_tokens must be a non-negative integer")
         temperature = request_body.get("temperature", 0.8)
+        if (
+            isinstance(temperature, bool)
+            or not isinstance(temperature, (int, float))
+            or not math.isfinite(temperature)
+            or temperature < 0
+        ):
+            raise ValueError("temperature must be a finite non-negative number")
+        top_k = request_body.get("top_k")
+        if top_k is not None and (
+            not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 0
+        ):
+            raise ValueError("top_k must be a non-negative integer")
+        top_p = request_body.get("top_p")
+        if top_p is not None and (
+            isinstance(top_p, bool)
+            or not isinstance(top_p, (int, float))
+            or not math.isfinite(top_p)
+            or not 0.0 <= top_p <= 1.0
+        ):
+            raise ValueError("top_p must be a finite number in [0, 1]")
 
         # Tokenize prompt
         if self.tokenizer is not None and hasattr(self.tokenizer, "encode"):

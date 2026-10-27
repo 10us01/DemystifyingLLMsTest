@@ -56,6 +56,9 @@ def create_handler_class(router: RouteHandler):
                 except Exception:
                     self._send_json_response(400, {"error": "Invalid JSON payload"})
                     return
+                if not isinstance(body, dict):
+                    self._send_json_response(400, {"error": "Request body must be a JSON object"})
+                    return
             else:
                 body = {}
 
