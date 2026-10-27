@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Model weights
+weights/
+*.pt
+*.pth
+*.bin
+!tests/**/*.pt
+
+# Pytest & logs
+.pytest_cache/
+htmlcov/
+.coverage
+results.xml
+score.json
+score_report.md
+leaderboard.json

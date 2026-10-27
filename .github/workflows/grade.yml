@@ -1,0 +1,135 @@
+name: "🧪 Autograde Challenge"
+
+on:
+  pull_request_target:
+    branches: ['main']
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout student code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          allow-unsafe-pr-checkout: true
+
+      - name: Verify test integrity
+        run: |
+          # Fetch the official main branch to ensure tests directory was not modified
+          git fetch https://github.com/harshit-iitr/DemystifyingLLMsTest.git main:official_main
+          if git diff official_main --name-only | grep -q "^tests/"; then
+            echo "::error::DISQUALIFIED - tests/ directory was modified!"
+            echo '## ❌ DISQUALIFIED' > score_report.md
+            echo '' >> score_report.md
+            echo 'You modified files in the `tests/` directory. This is not allowed.' >> score_report.md
+            echo '{"total": 0, "disqualified": true}' > score.json
+            cat score_report.md >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          # Ensure tests directory matches official main strictly
+          git checkout official_main -- tests/
+          echo "Tests directory integrity verified ✅"
+
+      - name: Decrypt hidden tests
+        env:
+          HIDDEN_TESTS_KEY: ${{ secrets.HIDDEN_TESTS_KEY }}
+        run: |
+          if [ -n "$HIDDEN_TESTS_KEY" ] && [ -f tests/.hidden_tests.enc ]; then
+            echo "Decrypting hidden tests..."
+            openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 \
+              -in tests/.hidden_tests.enc \
+              -out /tmp/hidden_tests.tar.gz \
+              -pass pass:"$HIDDEN_TESTS_KEY"
+            tar -xzf /tmp/hidden_tests.tar.gz -C tests/
+            rm -f /tmp/hidden_tests.tar.gz
+            echo "Successfully loaded 30 hidden tests (Total: $(ls tests/test_stage_*.py tests/test_integration_*.py | wc -l) tests)"
+          else
+            echo "::warning::HIDDEN_TESTS_KEY secret not found in repository secrets! Only running visible tests."
+          fi
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        run: |
+          python -m pytest tests/ \
+            --tb=no \
+            --no-header \
+            --show-capture=no \
+            -q \
+            --timeout=30 \
+            --junitxml=results.xml \
+            || true
+
+      - name: Clean up hidden tests
+        if: always()
+        run: |
+          rm -f tests/test_stage_1*.py tests/test_stage_2*.py tests/test_stage_3*.py tests/test_integration_*.py
+
+      - name: Compute score
+        if: hashFiles('results.xml') != ''
+        run: python scripts/grade.py results.xml
+
+      - name: Append to Job Summary
+        if: always()
+        run: |
+          if [ -f score_report.md ]; then
+            cat score_report.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Post score to PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('score_report.md')) return;
+            const report = fs.readFileSync('score_report.md', 'utf8');
+            
+            const prNumber = context.payload.pull_request ? context.payload.pull_request.number : context.issue.number;
+            
+            try {
+              const comments = await github.rest.issues.listComments({
+                issue_number: prNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              });
+              
+              for (const c of comments.data) {
+                if (c.body && c.body.includes('Autograder')) {
+                  await github.rest.issues.deleteComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: c.id
+                  });
+                }
+              }
+              
+              await github.rest.issues.createComment({
+                issue_number: prNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: report
+              });
+              console.log('Successfully posted score comment to PR #' + prNumber);
+            } catch (err) {
+              console.error('Error posting comment:', err);
+              throw err;
+            }
