@@ -1,13 +1,14 @@
 name: "🧪 Autograde Challenge"
 
 on:
-  pull_request:
+  pull_request_target:
     branches: ['main']
 
 permissions:
   contents: read
   checks: write
   pull-requests: write
+  issues: write
 
 jobs:
   grade:
@@ -18,16 +19,20 @@ jobs:
       - name: Checkout student code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Verify test integrity
         run: |
-          if git diff origin/main --name-only | grep -q "^tests/"; then
+          # Fetch the base branch to verify tests directory was not altered
+          git fetch origin main:origin_main
+          if git diff origin_main --name-only | grep -q "^tests/"; then
             echo "::error::DISQUALIFIED - tests/ directory was modified!"
             echo '## ❌ DISQUALIFIED' > score_report.md
             echo '' >> score_report.md
             echo 'You modified files in the `tests/` directory. This is not allowed.' >> score_report.md
             echo '{"total": 0, "disqualified": true}' > score.json
+            cat score_report.md >> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "Tests directory integrity verified ✅"
@@ -43,14 +48,27 @@ jobs:
 
       - name: Run test suite
         run: |
-          python -m pytest tests/             --tb=no             --no-header             -q             --timeout=30             --junitxml=results.xml             || true
+          python -m pytest tests/ \
+            --tb=no \
+            --no-header \
+            -q \
+            --timeout=30 \
+            --junitxml=results.xml \
+            || true
 
       - name: Compute score
         if: hashFiles('results.xml') != ''
         run: python scripts/grade.py results.xml
 
+      - name: Append to Job Summary
+        if: always()
+        run: |
+          if [ -f score_report.md ]; then
+            cat score_report.md >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Post score to PR
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
         with:
           script: |
@@ -58,25 +76,34 @@ jobs:
             if (!fs.existsSync('score_report.md')) return;
             const report = fs.readFileSync('score_report.md', 'utf8');
             
-            const comments = await github.rest.issues.listComments({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-            for (const c of comments.data) {
-              if (c.body && c.body.includes('Autograder')) {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: c.id
-                });
-              }
-            }
+            const prNumber = context.payload.pull_request ? context.payload.pull_request.number : context.issue.number;
             
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: report
-            });
+            try {
+              const comments = await github.rest.issues.listComments({
+                issue_number: prNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              });
+              
+              for (const c of comments.data) {
+                if (c.body && c.body.includes('Autograder')) {
+                  await github.rest.issues.deleteComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: c.id
+                  });
+                }
+              }
+              
+              await github.rest.issues.createComment({
+                issue_number: prNumber,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: report
+              });
+              console.log('Successfully posted score comment to PR #' + prNumber);
+            } catch (err) {
+              console.error('Error posting comment:', err);
+              throw err;
+            }
