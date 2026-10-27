@@ -41,5 +41,4 @@ class ResidualConnection(nn.Module):
         else:
             sublayer_out = sublayer
 
-        # return x + self.dropout(sublayer_out)
-        return x + x
+        return x + self.dropout(sublayer_out)

@@ -29,7 +29,12 @@ class RequestHandler:
         Returns:
             Formatted response dictionary.
         """
+        if not isinstance(request_body, dict):
+            raise ValueError("request body must be a JSON object")
+
         prompt = request_body.get("prompt", "")
+        if not isinstance(prompt, str):
+            raise ValueError("prompt must be a string")
         max_tokens = request_body.get("max_tokens", 16)
         temperature = request_body.get("temperature", 0.8)
 
@@ -46,13 +51,25 @@ class RequestHandler:
                 max_new_tokens=max_tokens,
                 temperature=temperature
             )
+            response_text = (
+                self.tokenizer.decode(generated_tokens)
+                if self.tokenizer is not None and hasattr(self.tokenizer, "decode")
+                else " ".join(str(token) for token in generated_tokens)
+            )
         elif self.engine is not None and hasattr(self.engine, "generate"):
             raw_gen = self.engine.generate(prompt, tokenizer=self.tokenizer, max_new_tokens=max_tokens)
-            generated_tokens = prompt_tokens + [101, 102]
+            response_text = raw_gen
+            try:
+                generated_tokens = self.tokenizer.encode(raw_gen) if self.tokenizer is not None else prompt_tokens
+            except Exception:
+                generated_tokens = prompt_tokens
         else:
             generated_tokens = prompt_tokens + [prompt_tokens[-1] + 1 if prompt_tokens else 42]
-
-        response_text = generated_tokens
+            response_text = (
+                self.tokenizer.decode(generated_tokens)
+                if self.tokenizer is not None and hasattr(self.tokenizer, "decode")
+                else " ".join(str(token) for token in generated_tokens)
+            )
 
         return {
             "id": f"cmpl-{uuid.uuid4().hex[:12]}",
@@ -69,7 +86,7 @@ class RequestHandler:
             ],
             "usage": {
                 "prompt_tokens": len(prompt_tokens),
-                "completion_tokens": len(generated_tokens) - len(prompt_tokens),
+                "completion_tokens": max(0, len(generated_tokens) - len(prompt_tokens)),
                 "total_tokens": len(generated_tokens)
             }
         }

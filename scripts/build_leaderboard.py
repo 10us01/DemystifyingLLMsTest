@@ -37,6 +37,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 from pathlib import Path
+from typing import Union
 
 # Enforce UTF-8 stdout on Windows terminals
 if sys.platform == "win32":
@@ -50,7 +51,7 @@ DEFAULT_REPO = "harshit-iitr/DemystifyingLLMsTest"
 DEFAULT_CUTOFF = 100
 
 
-def github_api_get(url: str, token: str = None) -> list | dict:
+def github_api_get(url: str, token: str = None) -> Union[list, dict]:
     """Perform a GET request to GitHub REST API with rate-limit handling."""
     headers = {
         "Accept": "application/vnd.github.v3+json",
