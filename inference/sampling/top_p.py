@@ -1,5 +1,4 @@
 """Nucleus top-p sampling. Assigned: Sarthak. Bug: M5"""
-import math
 import torch
 import torch.nn.functional as F
 
@@ -8,22 +7,17 @@ def apply_top_p(logits: torch.Tensor, p: float) -> torch.Tensor:
     """
     Nucleus sampling.
     """
-    if not math.isfinite(p):
-        raise ValueError(f"p must be finite, got {p}")
-    if p >= 1.0:
+    if p >= 1.0 or p <= 0.0:
         return logits
-    if p < 0.0:
-        raise ValueError(f"top_p must be non-negative, got {p}")
 
     sorted_logits, sorted_indices = torch.sort(logits, descending=True, dim=-1)
     sorted_probs = F.softmax(sorted_logits, dim=-1)
     cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
-    remove_mask = cumulative_probs > p
-    # Keep the first token that takes cumulative probability over the threshold.
-    remove_mask[..., 1:] = remove_mask[..., :-1].clone()
-    remove_mask[..., 0] = False
-    original_order_mask = torch.zeros_like(remove_mask).scatter(-1, sorted_indices, remove_mask)
+    remove_sorted = cumulative_probs > p
+    remove_sorted[..., 1:] = remove_sorted[..., :-1].clone()
+    remove_sorted[..., 0] = False
+    remove_mask = torch.zeros_like(remove_sorted).scatter(-1, sorted_indices, remove_sorted)
 
     filtered_logits = logits.clone()
-    filtered_logits[original_order_mask] = float("-inf")
+    filtered_logits[remove_mask] = float("-inf")
     return filtered_logits

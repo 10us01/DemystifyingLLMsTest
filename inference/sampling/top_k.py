@@ -6,8 +6,6 @@ def apply_top_k(logits: torch.Tensor, k: int) -> torch.Tensor:
     """
     Mask logits outside top-k.
     """
-    if not isinstance(k, int) or isinstance(k, bool):
-        raise ValueError("k must be an integer")
     if k <= 0 or k >= logits.size(-1):
         return logits
 

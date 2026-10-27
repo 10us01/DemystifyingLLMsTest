@@ -38,6 +38,7 @@ def scaled_dot_product_attention(
 
     # Compute raw query-key dot products: (batch, n_heads, seq_len_q, seq_len_k)
     scores = torch.matmul(q, k.transpose(-2, -1))
+
     scores = scores / math.sqrt(d_k)
 
     if mask is not None:

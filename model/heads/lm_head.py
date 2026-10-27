@@ -61,9 +61,4 @@ class LMHead(nn.Module):
         """
         Tie the weights of the LM head to the input token embedding matrix (standard GPT-2).
         """
-        if embedding_weight.shape != self.proj.weight.shape:
-            raise ValueError(
-                f"embedding weight shape {tuple(embedding_weight.shape)} does not match "
-                f"LM head shape {tuple(self.proj.weight.shape)}"
-            )
         self.proj.weight = embedding_weight

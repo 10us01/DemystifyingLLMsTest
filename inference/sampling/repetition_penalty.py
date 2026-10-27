@@ -1,5 +1,4 @@
 """Repetition penalty. Assigned: Sarthak. Bug: H4"""
-import math
 import torch
 from typing import List, Union
 
@@ -11,34 +10,25 @@ def apply_repetition_penalty(
 ) -> torch.Tensor:
     """
     Apply repetition penalty to logits for generated tokens.
-    Divide positive logits by the penalty and multiply negative logits by it.
+    DIVISIVELY (logits / penalty for pos, logits * penalty for neg).
     """
-    if not math.isfinite(penalty) or penalty <= 0.0:
-        raise ValueError(f"penalty must be positive, got {penalty}")
     if penalty == 1.0:
         return logits
 
-    logits = logits.clone().contiguous()
+    logits = logits.clone()
     if isinstance(generated_tokens, torch.Tensor):
-        tokens = generated_tokens
+        unique_tokens = torch.unique(generated_tokens).tolist()
     else:
-        tokens = torch.as_tensor(generated_tokens, device=logits.device)
+        unique_tokens = list(set(generated_tokens))
 
-    tokens = tokens.to(device=logits.device, dtype=torch.long)
-    vocab_size = logits.size(-1)
-    if torch.any((tokens < 0) | (tokens >= vocab_size)):
-        raise ValueError("generated token ID is outside the logits vocabulary")
-
-    if logits.dim() >= 2 and tokens.dim() >= 2 and tokens.size(0) == logits.size(0):
-        rows = logits.reshape(logits.size(0), -1, vocab_size)
-        token_rows = tokens.reshape(tokens.size(0), -1)
-        for row_idx, row_tokens in enumerate(token_rows):
-            ids = torch.unique(row_tokens)
-            values = rows[row_idx, :, ids]
-            rows[row_idx, :, ids] = torch.where(values > 0, values / penalty, values * penalty)
-    else:
-        ids = torch.unique(tokens)
-        values = logits[..., ids]
-        logits[..., ids] = torch.where(values > 0, values / penalty, values * penalty)
+    for token_id in unique_tokens:
+        if token_id < 0 or token_id >= logits.size(-1):
+            continue
+        token_logits = logits[..., token_id]
+        logits[..., token_id] = torch.where(
+            token_logits > 0,
+            token_logits / penalty,
+            token_logits * penalty,
+        )
 
     return logits
