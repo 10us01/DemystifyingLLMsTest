@@ -12,6 +12,8 @@ import torch.nn as nn
 
 def rotate_half(x: torch.Tensor) -> torch.Tensor:
     """Rotates half the hidden dimensions of the input."""
+    if x.shape[-1] % 2:
+        raise ValueError("rotary embedding dimension must be even")
     x1 = x[..., : x.shape[-1] // 2]
     x2 = x[..., x.shape[-1] // 2 :]
     return torch.cat((-x2, x1), dim=-1)
@@ -38,6 +40,10 @@ class RotaryEmbedding(nn.Module):
 
     def __init__(self, dim: int, max_seq_len: int = 2048, base: float = 10000.0):
         super().__init__()
+        if dim <= 0 or dim % 2:
+            raise ValueError("dim must be a positive even integer")
+        if max_seq_len <= 0:
+            raise ValueError("max_seq_len must be positive")
         self.dim = dim
         self.max_seq_len = max_seq_len
         self.base = base
@@ -51,8 +57,14 @@ class RotaryEmbedding(nn.Module):
         self.register_buffer("cos_cached", emb.cos(), persistent=False)
         self.register_buffer("sin_cached", emb.sin(), persistent=False)
 
-    def forward(self, x: torch.Tensor, seq_len: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        cos = self.cos_cached[:seq_len, :].to(dtype=x.dtype, device=x.device)
-        sin = self.sin_cached[:seq_len, :].to(dtype=x.dtype, device=x.device)
+    def forward(
+        self, x: torch.Tensor, seq_len: int, offset: int = 0
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if offset < 0 or seq_len < 0 or offset + seq_len > self.max_seq_len:
+            raise ValueError(
+                f"requested positions [{offset}, {offset + seq_len}) exceed max_seq_len {self.max_seq_len}"
+            )
+        cos = self.cos_cached[offset:offset + seq_len, :].to(dtype=x.dtype, device=x.device)
+        sin = self.sin_cached[offset:offset + seq_len, :].to(dtype=x.dtype, device=x.device)
         # Reshape to (1, 1, seq_len, dim) for head broadcasting
         return cos.unsqueeze(0).unsqueeze(0), sin.unsqueeze(0).unsqueeze(0)

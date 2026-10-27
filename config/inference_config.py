@@ -5,11 +5,12 @@ Inference and text generation configuration.
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Dict, Any
 import json
+import math
 
 
 @dataclass
 class InferenceConfig:
-    max_new_tokens: int = 0
+    max_new_tokens: int = 64
     use_kv_cache: bool = True
     temperature: float = 0.8
     top_k: int = 50
@@ -20,18 +21,27 @@ class InferenceConfig:
     beam_width: int = 1         # 1 indicates greedy / stochastic sampling (non-beam)
     seed: Optional[int] = 42
 
+    def __post_init__(self) -> None:
+        self.validate()
+
     def validate(self) -> None:
         """Validate inference parameters."""
+        if not isinstance(self.max_new_tokens, int) or isinstance(self.max_new_tokens, bool):
+            raise ValueError("max_new_tokens must be an integer")
         if self.max_new_tokens < 0:
             raise ValueError(f"max_new_tokens must be non-negative, got {self.max_new_tokens}")
-        if self.temperature < 0.0:
+        if not math.isfinite(self.temperature) or self.temperature < 0.0:
             raise ValueError(f"temperature must be non-negative, got {self.temperature}")
-        if not (0.0 <= self.top_p <= 1.0):
+        if not math.isfinite(self.top_p) or not (0.0 <= self.top_p <= 1.0):
             raise ValueError(f"top_p must be in [0.0, 1.0], got {self.top_p}")
-        if self.top_k < 0:
+        if not isinstance(self.top_k, int) or isinstance(self.top_k, bool) or self.top_k < 0:
             raise ValueError(f"top_k must be non-negative, got {self.top_k}")
-        if self.repetition_penalty <= 0.0:
+        if not math.isfinite(self.repetition_penalty) or self.repetition_penalty <= 0.0:
             raise ValueError(f"repetition_penalty must be positive, got {self.repetition_penalty}")
+        if not isinstance(self.beam_width, int) or isinstance(self.beam_width, bool) or self.beam_width <= 0:
+            raise ValueError(f"beam_width must be positive, got {self.beam_width}")
+        if self.seed is not None and (not isinstance(self.seed, int) or isinstance(self.seed, bool)):
+            raise ValueError("seed must be an integer or None")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""

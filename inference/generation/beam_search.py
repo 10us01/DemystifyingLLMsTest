@@ -29,9 +29,10 @@ class BeamSearch:
                 if isinstance(logits, tuple):
                     logits = logits[0]
                 next_log_probs = torch.log_softmax(logits[:, -1, :], dim=-1)
-                topk_probs, topk_ids = torch.topk(next_log_probs, self.beam_width, dim=-1)
+                candidate_count = min(self.beam_width, next_log_probs.size(-1))
+                topk_probs, topk_ids = torch.topk(next_log_probs, candidate_count, dim=-1)
 
-                for k in range(self.beam_width):
+                for k in range(candidate_count):
                     cand_id = topk_ids[:, k:k+1]
                     cand_score = score + topk_probs[0, k].item()
                     cand_seq = torch.cat([seq, cand_id], dim=-1)
