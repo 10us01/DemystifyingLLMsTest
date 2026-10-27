@@ -1,12 +1,12 @@
 # 🏆 OpenAI x DSG Workshop — Live Challenge Leaderboard
 
-*Last updated: `2026-10-27 06:54:10 UTC`*  
+*Last updated: `2026-10-27 07:04:56 UTC`*  
 *Total participants: `1`*  
 *Prize cutoff: Top `100` win ChatGPT Plus subscriptions!*
 
 | Rank | Status | Student Name | Roll No | GitHub | Score | Tests Passed | PR | Submitted At |
 |:---:|:---:|---|---|---|:---:|:---:|:---:|---|
-| **1** | 🎉 Winner | testing 3 | `—` | [@champions10kill-spec](https://github.com/champions10kill-spec) | **1 / 130** | `1 / 40` | [#3](https://github.com/harshit-iitr/DemystifyingLLMsTest/pull/3) | 2026-10-27 06:45:27 |
+| **1** | 🎉 Winner | testing 2 | `—` | [@champions10kill-spec](https://github.com/champions10kill-spec) | **1 / 130** | `1 / 40` | [#4](https://github.com/harshit-iitr/DemystifyingLLMsTest/pull/4) | 2026-10-27 07:02:16 |
 
 ---
 ### ℹ️ How Scoring & Ties Work
