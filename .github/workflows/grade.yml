@@ -19,14 +19,16 @@ jobs:
       - name: Checkout student code
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          allow-unsafe-pr-checkout: true
 
       - name: Verify test integrity
         run: |
-          # Fetch the base branch to verify tests directory was not altered
-          git fetch origin main:origin_main
-          if git diff origin_main --name-only | grep -q "^tests/"; then
+          # Fetch the official main branch to ensure tests directory was not modified
+          git fetch https://github.com/harshit-iitr/DemystifyingLLMsTest.git main:official_main
+          if git diff official_main --name-only | grep -q "^tests/"; then
             echo "::error::DISQUALIFIED - tests/ directory was modified!"
             echo '## ❌ DISQUALIFIED' > score_report.md
             echo '' >> score_report.md
